@@ -15,7 +15,7 @@ export default function DailyChallengeScreen({ navigation }) {
 
         <Text style={styles.icon}>⚡</Text>
         <Text style={styles.title}>Daily Challenge</Text>
-        <Text style={styles.subtitle}>5 questions from all modules</Text>
+        <Text style={styles.subtitle}>5 questions across all 6 modules</Text>
 
         <View style={styles.rewardCard}>
           <Text style={styles.rewardLabel}>REWARD</Text>
@@ -24,7 +24,7 @@ export default function DailyChallengeScreen({ navigation }) {
         </View>
 
         <View style={styles.rules}>
-          <Text style={styles.ruleItem}>⭐ Mixed questions from all 3 modules</Text>
+          <Text style={styles.ruleItem}>⭐ Mixed questions from all 6 modules</Text>
           <Text style={styles.ruleItem}>❤️ Hearts system applies</Text>
           <Text style={styles.ruleItem}>🏆 2× XP multiplier on your score</Text>
           <Text style={styles.ruleItem}>🔄 Resets at midnight</Text>

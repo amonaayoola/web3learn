@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Clipboard, Animated, Platform,
+  SafeAreaView, Animated, Platform,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { useProgress } from '../context/ProgressContext';
@@ -49,7 +50,7 @@ export default function WalletScreen({ navigation }) {
   const isModuleDone = (moduleId) => !!completedQuizzes[moduleId];
 
   const handleCopy = () => {
-    Clipboard.setString(address);
+    Clipboard.setStringAsync(address);
     setCopied(true);
     Animated.sequence([
       Animated.timing(copyAnim, { toValue: 1, duration: 150, useNativeDriver: true }),

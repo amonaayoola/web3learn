@@ -3,6 +3,7 @@
     "name": "Web3Learn",
     "slug": "web3learn",
     "version": "1.0.0",
+    "scheme": "web3learn",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
