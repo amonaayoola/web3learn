@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Environment — never commit real keys
+.env
+.env.local
+.env.production
+
+# Native
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+ios/
+android/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
