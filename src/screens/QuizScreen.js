@@ -1,24 +1,31 @@
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Animated,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProgress } from '../context/ProgressContext';
-import { curriculum } from '../data/curriculum';
+import { findModule } from '../data/allModules';
 import HeartsDisplay from '../components/HeartsDisplay';
 import { getRefillCountdown } from '../utils/heartsUtils';
 import { colors, spacing, radius, moduleColors } from '../theme';
 
 export default function QuizScreen({ navigation, route }) {
   const { moduleId, isDaily = false, questions: passedQuestions } = route.params || {};
-  const moduleIndex = curriculum.findIndex(m => m.id === moduleId);
-  const module = moduleId ? curriculum[moduleIndex] : null;
+  const { module, moduleIndex } = moduleId ? findModule(moduleId) : { module: null, moduleIndex: -1 };
   const questions = passedQuestions || module?.quiz || [];
   const mc = moduleColors[moduleIndex] || { color: colors.primary, glow: colors.primaryGlow };
 
-  const [current, setCurrent] = useState(0);
+  // ── Queue-based state for retry logic ─────────────────────────────────
+  // queue holds question indices; wrong answers get re-appended
+  const [queue, setQueue] = useState(() => questions.map((_, i) => i));
+  const [qCursor, setQCursor] = useState(0);
+  // firstAttempts: { [questionIndex]: boolean } — tracks first-time correct/wrong
+  const [firstAttempts, setFirstAttempts] = useState({});
+  // missedSet: Set of question indices that were ever wrong
+  const [missedSet, setMissedSet] = useState(new Set());
+
   const [selected, setSelected] = useState(null);
   const [answered, setAnswered] = useState(false);
-  const [results, setResults] = useState([]);
   const [done, setDone] = useState(false);
   const [shakeHearts, setShakeHearts] = useState(false);
 
@@ -30,8 +37,18 @@ export default function QuizScreen({ navigation, route }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const q = questions[current];
+  // Current question from queue
+  const qIndex = queue[qCursor] ?? 0;
+  const q = questions[qIndex];
   const accentColor = isDaily ? colors.xpGold : (mc.color || colors.primary);
+
+  // Is this question being retried?
+  const isRetry = qIndex in firstAttempts && firstAttempts[qIndex] === false;
+
+  // Progress: unique questions answered / total (stays put during retries)
+  const uniqueAnswered = Object.keys(firstAttempts).length;
+  const progressFraction = questions.length > 0 ? uniqueAnswered / questions.length : 0;
+  const retryCount = queue.length - questions.length;
 
   const isAnswerCorrect = (optionIndex, question) => {
     const type = question.type || 'multiple_choice';
@@ -45,9 +62,20 @@ export default function QuizScreen({ navigation, route }) {
     setAnswered(true);
 
     const correct = isAnswerCorrect(optionIndex, q);
-    setResults(prev => [...prev, { questionId: q.id, correct }]);
+    const isFirstAttempt = !(qIndex in firstAttempts);
+
+    // Record first attempt only
+    if (isFirstAttempt) {
+      setFirstAttempts(prev => ({ ...prev, [qIndex]: correct }));
+    }
 
     if (!correct) {
+      if (isFirstAttempt) {
+        setMissedSet(prev => new Set([...prev, qIndex]));
+      }
+      // Re-append to queue so the user sees it again
+      setQueue(prev => [...prev, qIndex]);
+
       const newHearts = await loseHeart();
       setCurrentHearts(newHearts);
       setShakeHearts(true);
@@ -60,7 +88,7 @@ export default function QuizScreen({ navigation, route }) {
   };
 
   const handleNext = () => {
-    if (current + 1 >= questions.length) {
+    if (qCursor + 1 >= queue.length) {
       finishQuiz();
       return;
     }
@@ -68,7 +96,7 @@ export default function QuizScreen({ navigation, route }) {
       Animated.timing(fadeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: -16, duration: 120, useNativeDriver: true }),
     ]).start(() => {
-      setCurrent(c => c + 1);
+      setQCursor(c => c + 1);
       setSelected(null);
       setAnswered(false);
       slideAnim.setValue(16);
@@ -80,11 +108,16 @@ export default function QuizScreen({ navigation, route }) {
   };
 
   const finishQuiz = async () => {
-    const allResults = [...results, { questionId: q.id, correct: selected !== null && isAnswerCorrect(selected, q) }];
-    const correct = allResults.filter(r => r.correct).length;
-    const baseXP = Math.round((correct / questions.length) * 100);
+    // Include current question if not yet tracked (handles the very last answer)
+    const finalFirstAttempts = { ...firstAttempts };
+    if (!(qIndex in finalFirstAttempts)) {
+      finalFirstAttempts[qIndex] = selected !== null && isAnswerCorrect(selected, q);
+    }
+    const correctCount = Object.values(finalFirstAttempts).filter(Boolean).length;
+    const baseXP = Math.round((correctCount / questions.length) * 100);
     const earned = await completeQuiz(moduleId || 'daily', baseXP, isDaily);
     setXpEarned(earned);
+    setFirstAttempts(finalFirstAttempts);
     setDone(true);
   };
 
@@ -206,9 +239,11 @@ export default function QuizScreen({ navigation, route }) {
 
   // ─── Results Screen ───────────────────────────────────────────────────
   if (done) {
-    const correct = results.filter(r => r.correct).length;
+    const correct = Object.values(firstAttempts).filter(Boolean).length;
     const total = questions.length;
     const pct = Math.round((correct / total) * 100);
+    const retries = missedSet.size;
+
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.resultContent}>
@@ -225,8 +260,20 @@ export default function QuizScreen({ navigation, route }) {
           </View>
           <Text style={styles.resultScore}>{correct} of {total} correct · {pct}%</Text>
 
+          {retries > 0 && (
+            <View style={styles.retryBanner}>
+              <Text style={styles.retryBannerText}>
+                🔄 {retries} question{retries > 1 ? 's' : ''} needed a retry
+              </Text>
+            </View>
+          )}
+
           {questions.map((q, i) => {
-            const r = results[i];
+            const wasCorrectFirstTry = firstAttempts[i] === true;
+            // In missedSet = got it wrong first, but eventually answered correctly
+            const wasRetried = missedSet.has(i);
+            // Display as correct if either first-try right OR retried to success
+            const displayCorrect = wasCorrectFirstTry || wasRetried;
             const correctLabel = q.type === 'true_false'
               ? (q.correct ? 'True' : 'False')
               : q.type === 'fill_blank'
@@ -234,10 +281,13 @@ export default function QuizScreen({ navigation, route }) {
               : q.options[q.correct];
 
             return (
-              <View key={q.id} style={[styles.resultItem, r?.correct ? styles.resultItemCorrect : styles.resultItemWrong]}>
+              <View key={q.id} style={[styles.resultItem, displayCorrect ? styles.resultItemCorrect : styles.resultItemWrong]}>
                 <Text style={styles.resultQ}>{q.question}</Text>
-                <Text style={styles.resultA}>{r?.correct ? '✅' : '❌'} {correctLabel}</Text>
-                {!r?.correct && <Text style={styles.resultExp}>{q.explanation}</Text>}
+                <Text style={styles.resultA}>
+                  {wasCorrectFirstTry ? '✅' : wasRetried ? '🔄' : '❌'} {correctLabel}
+                </Text>
+                {wasRetried && <Text style={styles.resultExp}>Got it after a retry — nice recovery!</Text>}
+                {!displayCorrect && <Text style={styles.resultExp}>{q.explanation}</Text>}
               </View>
             );
           })}
@@ -261,9 +311,12 @@ export default function QuizScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={styles.progressWrap}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${((current + 1) / questions.length) * 100}%`, backgroundColor: accentColor }]} />
+            <View style={[styles.progressFill, { width: `${progressFraction * 100}%`, backgroundColor: accentColor }]} />
           </View>
-          <Text style={styles.progressLabel}>{current + 1}/{questions.length}</Text>
+          <Text style={styles.progressLabel}>
+            {uniqueAnswered}/{questions.length}
+            {retryCount > 0 ? `  ·  🔄 ${retryCount}` : ''}
+          </Text>
         </View>
         <HeartsDisplay hearts={currentHearts} shake={shakeHearts} />
       </View>
@@ -274,11 +327,18 @@ export default function QuizScreen({ navigation, route }) {
         scrollEnabled={false}
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          {/* Question type badge */}
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>
-              {(q.type === 'true_false') ? 'TRUE OR FALSE' : (q.type === 'fill_blank') ? 'FILL IN THE BLANK' : 'MULTIPLE CHOICE'}
-            </Text>
+          {/* Question type / retry badge */}
+          <View style={styles.badgeRow}>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>
+                {(q.type === 'true_false') ? 'TRUE OR FALSE' : (q.type === 'fill_blank') ? 'FILL IN THE BLANK' : 'MULTIPLE CHOICE'}
+              </Text>
+            </View>
+            {isRetry && (
+              <View style={[styles.typeBadge, styles.retryBadge]}>
+                <Text style={[styles.typeBadgeText, { color: colors.error }]}>🔄 TRY AGAIN</Text>
+              </View>
+            )}
           </View>
 
           <Text style={styles.question}>{q.question}</Text>
@@ -286,7 +346,7 @@ export default function QuizScreen({ navigation, route }) {
 
           {answered && (
             <View style={[styles.feedbackCard, isCurrentCorrect ? styles.feedbackCorrect : styles.feedbackWrong]}>
-              <Text style={styles.feedbackTitle}>{isCurrentCorrect ? '✅ Correct!' : '❌ Not quite'}</Text>
+              <Text style={styles.feedbackTitle}>{isCurrentCorrect ? '✅ Correct!' : '❌ Not quite — you\'ll see this again'}</Text>
               <Text style={styles.feedbackBody}>{q.explanation}</Text>
             </View>
           )}
@@ -301,7 +361,7 @@ export default function QuizScreen({ navigation, route }) {
             activeOpacity={0.85}
           >
             <Text style={styles.fullBtnText}>
-              {current + 1 >= questions.length ? 'See Results' : 'Next →'}
+              {qCursor + 1 >= queue.length ? 'See Results' : isCurrentCorrect ? 'Next →' : 'Got it →'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -362,15 +422,19 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 10, color: colors.textMuted, textAlign: 'right' },
 
   quizContent: { padding: spacing.md, paddingBottom: spacing.xl },
+  badgeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   typeBadge: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surface,
     borderRadius: radius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  retryBadge: {
+    borderColor: colors.error + '60',
+    backgroundColor: colors.errorBg,
   },
   typeBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, color: colors.textMuted },
   question: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, lineHeight: 28, marginBottom: spacing.xl, letterSpacing: -0.2 },
@@ -383,9 +447,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   optionLetter: {
     width: 32, height: 32, borderRadius: 16,
@@ -449,7 +518,18 @@ const styles = StyleSheet.create({
   resultXpRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 4 },
   resultXp: { fontSize: 52, fontWeight: '900', color: colors.xpGold },
   resultXpLabel: { fontSize: 20, fontWeight: '700', color: colors.xpGold, opacity: 0.7 },
-  resultScore: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.xl },
+  resultScore: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.md },
+  retryBanner: {
+    backgroundColor: colors.errorBg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.errorBorder,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    alignSelf: 'stretch',
+  },
+  retryBannerText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
   resultItem: { width: '100%', borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, marginBottom: spacing.sm },
   resultItemCorrect: { backgroundColor: colors.successBg, borderColor: colors.successBorder },
   resultItemWrong: { backgroundColor: colors.errorBg, borderColor: colors.errorBorder },

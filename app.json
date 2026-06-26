@@ -1,28 +1,34 @@
 {
   "expo": {
-    "name": "Web3Learn",
-    "slug": "web3learn",
+    "name": "MAIDEN",
+    "slug": "maiden",
     "version": "1.0.0",
-    "scheme": "web3learn",
+    "scheme": "maiden",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0D0F1E"
+      "backgroundColor": "#7C3AED"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.web3learn.app"
+      "bundleIdentifier": "com.maiden.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0D0F1E"
+        "backgroundColor": "#7C3AED"
       },
-      "package": "com.web3learn.app"
-    }
+      "package": "com.maiden.app"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
   }
 }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useProgress } from '../context/ProgressContext';
 import { curriculum } from '../data/curriculum';
@@ -160,18 +161,23 @@ const styles = StyleSheet.create({
   guestLabel: { fontSize: 12, color: colors.textMuted, fontStyle: 'italic' },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   cardTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, marginBottom: spacing.sm, textTransform: 'uppercase' },
   cardSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.sm },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   statCard: {
-    flex: 1, backgroundColor: colors.surface, borderRadius: radius.md,
-    padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border,
+    flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.sm, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
   },
   statValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
   statLabel: { fontSize: 10, color: colors.textMuted, marginTop: 2 },

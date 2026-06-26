@@ -3,7 +3,7 @@ import { View, Text, Animated, StyleSheet } from 'react-native';
 import { colors, spacing } from '../theme';
 import { getRank, getRankProgress, getNextRank } from '../utils/rankUtils';
 
-export default function AnimatedXPBar({ xp }) {
+export default function AnimatedXPBar({ xp, onBlue = false }) {
   const { progress, xpInRank, xpNeeded } = getRankProgress(xp);
   const rank = getRank(xp);
   const nextRank = getNextRank(xp);
@@ -12,7 +12,7 @@ export default function AnimatedXPBar({ xp }) {
   useEffect(() => {
     Animated.timing(animValue, {
       toValue: Math.max(0.02, progress),
-      duration: 700,
+      duration: 900,
       useNativeDriver: false,
     }).start();
   }, [progress]);
@@ -22,17 +22,18 @@ export default function AnimatedXPBar({ xp }) {
     outputRange: ['0%', '100%'],
   });
 
+  const trackColor = onBlue ? 'rgba(255,255,255,0.20)' : colors.border;
+  const fillColor = onBlue ? '#FFFFFF' : rank.color;
+  const labelColor = onBlue ? 'rgba(255,255,255,0.75)' : colors.textMuted;
+
   return (
     <View style={styles.container}>
-      <View style={styles.track}>
-        <Animated.View style={[styles.fill, { width: barWidth }]}>
-          <View style={[styles.fillInner, { backgroundColor: rank.color }]} />
-          <View style={[styles.fillGlow, { backgroundColor: rank.color }]} />
-        </Animated.View>
+      <View style={[styles.track, { backgroundColor: trackColor }]}>
+        <Animated.View style={[styles.fill, { width: barWidth, backgroundColor: fillColor }]} />
       </View>
       {nextRank && (
-        <Text style={styles.label}>
-          {xpInRank} / {xpNeeded} XP → {nextRank.name}
+        <Text style={[styles.label, { color: labelColor }]}>
+          {xpInRank} / {xpNeeded} XP to {nextRank.name}
         </Text>
       )}
     </View>
@@ -41,18 +42,7 @@ export default function AnimatedXPBar({ xp }) {
 
 const styles = StyleSheet.create({
   container: { width: '100%', gap: 6 },
-  track: {
-    height: 8,
-    backgroundColor: colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  fill: { height: '100%', position: 'relative' },
-  fillInner: { position: 'absolute', inset: 0, borderRadius: 4 },
-  fillGlow: {
-    position: 'absolute', inset: 0, borderRadius: 4,
-    opacity: 0.4,
-    transform: [{ scaleY: 2 }],
-  },
-  label: { fontSize: 11, color: colors.textMuted, textAlign: 'right' },
+  track: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
+  label: { fontSize: 11, textAlign: 'right' },
 });

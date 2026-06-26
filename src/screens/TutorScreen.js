@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
+  StyleSheet, KeyboardAvoidingView, Platform,
   Animated, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProgress } from '../context/ProgressContext';
 import { getRank } from '../utils/rankUtils';
 import { sendMessage, SUGGESTED_PROMPTS } from '../lib/aiTutor';
-import { colors, spacing, radius, typography } from '../theme';
+import { colors, spacing, radius, typography, shadows } from '../theme';
 
 const SAGE_INTRO = `Hey! I'm SAGE — your personal Web3 guide. I can explain any concept from the curriculum, answer questions about blockchain, wallets, DeFi, NFTs, and more, or tell you what to learn next.
 
@@ -298,7 +299,11 @@ const styles = StyleSheet.create({
   },
   bubbleSage: {
     backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
     borderBottomLeftRadius: 4,
   },
   bubbleUser: {

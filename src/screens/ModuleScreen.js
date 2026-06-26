@@ -1,14 +1,15 @@
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProgress } from '../context/ProgressContext';
-import { curriculum } from '../data/curriculum';
-import { colors, spacing, radius } from '../theme';
+import { findModule } from '../data/allModules';
+import { colors, spacing, radius, shadows } from '../theme';
 
 export default function ModuleScreen({ navigation, route }) {
   const { moduleId } = route.params;
-  const module = curriculum.find(m => m.id === moduleId);
+  const { module } = findModule(moduleId);
   const { isLessonCompleted, isQuizCompleted, getModuleProgress } = useProgress();
 
   if (!module) return null;
@@ -128,12 +129,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
     gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  lessonDone: { borderLeftWidth: 3, borderLeftColor: '#00E676' },
+  lessonDone: { borderLeftWidth: 3, borderLeftColor: colors.success },
   lessonLocked: { opacity: 0.5 },
   lessonNum: {
     width: 32,
@@ -150,10 +156,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1.5,
     padding: spacing.md,
     gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   quizLocked: { opacity: 0.5 },
   quizIcon: { fontSize: 32 },

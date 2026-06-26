@@ -8,9 +8,23 @@ const ProgressContext = createContext(null);
 
 const PROGRESS_KEY = '@web3learn_progress';
 const XP_KEY = '@web3learn_xp';
+const MP_KEY = '@web3learn_mp';
+const LEVEL_KEY = '@web3learn_level';
+
+// New users start with enough MAIDEN Points to try a game before earning more from quizzes
+const STARTER_MP = 20;
+const QUIZ_MP_REWARD = 5;
+
+// Modules unlocked from the start for each level
+const LEVEL_UNLOCKED = {
+  beginner: 1,      // only module 1 unlocked, sequential after
+  intermediate: 3,  // modules 1-3 unlocked, rest sequential
+  expert: 6,        // all 6 modules unlocked immediately
+};
 
 export const ProgressProvider = ({ children }) => {
   const [xp, setXp] = useState(0);
+  const [mp, setMp] = useState(STARTER_MP);
   const [completedLessons, setCompletedLessons] = useState({});
   const [completedQuizzes, setCompletedQuizzes] = useState({});
   const [streak, setStreak] = useState(0);
@@ -19,17 +33,20 @@ export const ProgressProvider = ({ children }) => {
   const [heartsLastRefill, setHeartsLastRefill] = useState(null);
   const [dailyChallengeCompleted, setDailyChallengeCompleted] = useState(false);
   const [consecutiveLessons, setConsecutiveLessons] = useState(0);
+  const [userLevel, setUserLevelState] = useState(null); // null = not onboarded
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       try {
-        const [progressStr, xpStr, streakData, heartsData, dcCompleted] = await Promise.all([
+        const [progressStr, xpStr, mpStr, streakData, heartsData, dcCompleted, levelStr] = await Promise.all([
           AsyncStorage.getItem(PROGRESS_KEY),
           AsyncStorage.getItem(XP_KEY),
+          AsyncStorage.getItem(MP_KEY),
           loadStreakData(),
           loadHearts(),
           isDailyChallengeCompleted(),
+          AsyncStorage.getItem(LEVEL_KEY),
         ]);
 
         if (progressStr) {
@@ -38,8 +55,10 @@ export const ProgressProvider = ({ children }) => {
           setCompletedQuizzes(p.completedQuizzes || {});
         }
         if (xpStr) setXp(parseInt(xpStr, 10));
+        if (mpStr !== null) setMp(parseInt(mpStr, 10));
+        else await AsyncStorage.setItem(MP_KEY, String(STARTER_MP));
+        if (levelStr) setUserLevelState(levelStr);
 
-        // Record today's activity and update streak
         const newStreak = await recordActivity(streakData.streak, streakData.lastActivity);
         setStreak(newStreak);
         setFreezeAvailable(streakData.freezeAvailable);
@@ -67,6 +86,27 @@ export const ProgressProvider = ({ children }) => {
     return newXP;
   };
 
+  const addMP = async (amount) => {
+    const newMP = mp + amount;
+    setMp(newMP);
+    await AsyncStorage.setItem(MP_KEY, String(newMP));
+    return newMP;
+  };
+
+  // Returns false (and leaves balance untouched) if the user can't afford the cost
+  const deductMP = async (amount) => {
+    if (mp < amount) return false;
+    const newMP = mp - amount;
+    setMp(newMP);
+    await AsyncStorage.setItem(MP_KEY, String(newMP));
+    return true;
+  };
+
+  const setLevel = async (level) => {
+    setUserLevelState(level);
+    await AsyncStorage.setItem(LEVEL_KEY, level);
+  };
+
   const completeLesson = async (lessonId, xpReward = 20) => {
     if (completedLessons[lessonId]) return;
     const newLessons = { ...completedLessons, [lessonId]: true };
@@ -87,6 +127,7 @@ export const ProgressProvider = ({ children }) => {
       await saveProgress(completedLessons, newQuizzes);
     }
     await addXP(finalXP);
+    await addMP(QUIZ_MP_REWARD);
 
     if (isDaily) {
       setDailyChallengeCompleted(true);
@@ -113,9 +154,27 @@ export const ProgressProvider = ({ children }) => {
     return { completed: done, total, percentage: total > 0 ? done / total : 0 };
   };
 
+  // Returns true if module at given index is accessible based on userLevel + progress
+  const isModuleLocked = (index, curriculum) => {
+    if (!userLevel) return index > 0; // default: sequential
+    const freeCount = LEVEL_UNLOCKED[userLevel] || 1;
+    // Modules within freeCount are always accessible
+    if (index < freeCount) return false;
+    // Beyond freeCount, require the previous module's quiz to be done
+    const prevModule = curriculum[index - 1];
+    return prevModule ? !completedQuizzes[prevModule.id] : false;
+  };
+
+  // Starting module index for this level (for highlighting on HomeScreen)
+  const startingModuleIndex = (() => {
+    if (!userLevel) return 0;
+    return Math.min(LEVEL_UNLOCKED[userLevel] - 1, 5);
+  })();
+
   return (
     <ProgressContext.Provider value={{
       xp,
+      mp,
       streak,
       freezeAvailable,
       hearts,
@@ -125,7 +184,13 @@ export const ProgressProvider = ({ children }) => {
       completedLessons,
       completedQuizzes,
       loaded,
+      userLevel,
+      isOnboarded: userLevel !== null,
+      startingModuleIndex,
+      setLevel,
       addXP,
+      addMP,
+      deductMP,
       completeLesson,
       completeQuiz,
       loseHeart,
@@ -133,6 +198,7 @@ export const ProgressProvider = ({ children }) => {
       isLessonCompleted,
       isQuizCompleted,
       getModuleProgress,
+      isModuleLocked,
     }}>
       {children}
     </ProgressContext.Provider>

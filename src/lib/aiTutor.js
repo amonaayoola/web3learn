@@ -9,7 +9,7 @@ const CURRICULUM_SUMMARY = curriculum
 export function buildSystemPrompt(userContext) {
   const { xp = 0, rankName = 'Crypto Curious', streak = 0, completedModules = [], hearts = 5 } = userContext;
 
-  return `You are SAGE — the AI tutor inside Web3Learn. You're sharp, warm, and genuinely excited about helping people understand Web3. You explain complex things simply without being condescending.
+  return `You are SAGE — the AI tutor inside MAIDEN. You're sharp, warm, and genuinely excited about helping people understand Web3. You explain complex things simply without being condescending.
 
 LEARNER SNAPSHOT:
 - XP: ${xp} | Rank: ${rankName}
