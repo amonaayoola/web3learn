@@ -6,6 +6,10 @@ node_modules/
 dist/
 web-build/
 
+# Next.js (web3learn-web)
+.next/
+.vercel/
+
 # Environment — never commit real keys
 .env
 .env.local
